@@ -1,153 +1,183 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>PvP Tournament Leaderboard</title>
-
+<title>LuminariSMP PvP Tournament</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap" rel="stylesheet">
 <style>
-body{font-family:Arial;background:#0b1020;color:white;padding:20px}
-.panel{background:#141a33;padding:15px;border-radius:12px;margin-bottom:15px}
-input,select,button{padding:8px;margin:4px;border-radius:8px;border:none}
-button{background:#22c55e;color:white;cursor:pointer}
-table{width:100%;border-collapse:collapse}
-td,th{border-bottom:1px solid #2a335c;padding:8px;text-align:center}
+body{margin:0;font-family:'Orbitron',sans-serif;background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);color:white;}
+header{text-align:center;padding:50px 20px;background:#14163c;}
+header h1{font-size:3em;color:#22c55e;margin-bottom:10px;}
+header p{color:#d1d5db;font-size:1.2em;}
+.panel{background:#1e223c;margin:20px auto;padding:20px;border-radius:15px;max-width:900px;box-shadow:0 0 20px rgba(0,0,0,0.5);}
+input,select,button{padding:10px;margin:5px;border-radius:8px;border:none;}
+button{background:#22c55e;color:white;font-weight:bold;cursor:pointer;transition:0.3s;}
+button:hover{background:#16a34a;}
+table{width:100%;border-collapse:collapse;}
+th,td{padding:12px;border-bottom:1px solid #334155;text-align:center;}
+th{background:#11142d;}
+td.dominant{background:#16a34a50;}
+td.closefight{background:#facc1550;}
+td.cleanfight{background:#38bdf850;}
+footer{text-align:center;padding:20px;color:#9ca3af;}
+#adminPanel{display:none;background:#11142d;padding:20px;border-radius:12px;margin-top:15px;}
+#bracketTable td{border:1px solid #334155;padding:8px;}
 </style>
 </head>
-
 <body>
 
-<h1>⚔️ PvP Tournament Leaderboard</h1>
+<header>
+<h1>LuminariSMP PvP Tournament</h1>
+<p>Compete in Axe, Nethpot, SMP, and Mace. Climb the leaderboard to become Combat Grandmaster!</p>
+<a href="#leaderboard" style="color:#22c55e">Jump to Leaderboard ↓</a>
+</header>
 
+<!-- MATCH PANEL -->
 <div class="panel">
-<h3>Record Best-of-3 Match</h3>
-Player A <input id="A">
-Player B <input id="B">
-
-<select id="mode">
-<option>Axe</option>
-<option>Nethpot</option>
-<option>SMP</option>
-<option>Mace</option>
-</select>
-
-A Wins <input id="aW" type="number" min="0" max="2">
-B Wins <input id="bW" type="number" min="0" max="2">
-
-<button onclick="addMatch()">Submit Match</button>
+<h2>Record Best-of-3 Match</h2>
+Player A: <input id="playerA"> Player B: <input id="playerB"><br>
+Gamemode: <select id="mode"><option>Axe</option><option>Nethpot</option><option>SMP</option><option>Mace</option></select><br>
+A Wins: <input id="aWins" type="number" min="0" max="3"> B Wins: <input id="bWins" type="number" min="0" max="3"><br>
+<button onclick="recordMatch()">Submit Match</button>
 </div>
 
+<!-- ADMIN PANEL -->
 <div class="panel">
-<button onclick="admin()">Admin Config</button>
+<button onclick="toggleAdmin()">Admin Panel</button>
+<div id="adminPanel">
+<h3>Admin Dashboard</h3>
+<label>Set Axe Win Points:</label><input id="axePts" type="number"><br>
+<label>Set Nethpot Win Points:</label><input id="nethPts" type="number"><br>
+<label>Set SMP Win Points:</label><input id="smpPts" type="number"><br>
+<label>Set Mace Win Points:</label><input id="macePts" type="number"><br>
+<label>Loss Penalty:</label><input id="lossPts" type="number"><br>
+<h3>Create Tournament</h3>
+<textarea id="tournamentPlayers" placeholder="Enter player names separated by commas"></textarea><br>
+<button onclick="createTournament()">Create Tournament</button>
+</div>
 </div>
 
-<div class="panel">
-<h3>Leaderboard</h3>
+<!-- LEADERBOARD -->
+<div class="panel" id="leaderboard">
+<h2>Leaderboard</h2>
 <table>
-<thead>
-<tr><th>#</th><th>Name</th><th>Points</th><th>Tier</th><th>Title</th></tr>
-</thead>
+<thead><tr><th>Rank</th><th>Player</th><th>Points</th><th>Tier</th><th>Title</th><th>Last Match</th></tr></thead>
 <tbody id="board"></tbody>
 </table>
 </div>
 
+<!-- TOURNAMENT BRACKET -->
 <div class="panel">
-<h3>Recent Matches</h3>
-<div id="log"></div>
+<h2>Tournament Bracket</h2>
+<div id="bracket"></div>
+<button onclick="advanceWinners()">Advance Winners</button>
 </div>
 
+<footer>
+&copy; 2026 LuminariSMP PvP Tournament
+</footer>
+
 <script>
+/* ===== CONFIG ===== */
+const ADMIN_PASS="Kensu.com2";
+let cfg={Axe:10,Nethpot:12,SMP:8,Mace:9,loss:4};
+let db={players:{},matches:[],tournament:null};
 
-const PASS="K=Kensu.com2";
+/* ===== TITLES ===== */
+function getTier(p){if(p>=450)return"High Tier 1";if(p>=400)return"Low Tier 1";if(p>=350)return"High Tier 2";if(p>=300)return"Low Tier 2";if(p>=250)return"High Tier 3";if(p>=200)return"Low Tier 3";if(p>=150)return"High Tier 4";if(p>=100)return"Low Tier 4";if(p>=50)return"High Tier 5";return"Low Tier 5";}
+function getTitle(p){if(p>=400)return"🏆 Combat Grandmaster";if(p>=250)return"🥇 Combat Master";if(p>=100)return"🥈 Combat Ace";if(p>=50)return"🥉 Combat Specialist";if(p>=20)return"⚔️ Combat Cadet";if(p>=10)return"🛡️ Combat Novice";return"🔰 Rookie";}
 
-let cfg = JSON.parse(localStorage.cfg || '{"Axe":10,"Nethpot":12,"SMP":8,"Mace":9,"loss":4}');
-let db = JSON.parse(localStorage.db || '{"players":{},"log":[]}');
-
-function save(){
-localStorage.cfg=JSON.stringify(cfg);
-localStorage.db=JSON.stringify(db);
+/* ===== LEADERBOARD ===== */
+function renderLeaderboard(){
+  let arr=Object.entries(db.players).map(([n,d])=>({name:n,pts:d.pts,last:d.last})).sort((a,b)=>b.pts-a.pts);
+  board.innerHTML=arr.map((p,i)=>`<tr><td>${i+1}</td><td>${p.name}</td><td>${p.pts}</td><td>${getTier(p.pts)}</td><td>${getTitle(p.pts)}</td><td>${p.last||''}</td></tr>`).join("");
 }
 
-function tier(p){
-if(p>=450)return"High Tier 1";
-if(p>=400)return"Low Tier 1";
-if(p>=350)return"High Tier 2";
-if(p>=300)return"Low Tier 2";
-if(p>=250)return"High Tier 3";
-if(p>=200)return"Low Tier 3";
-if(p>=150)return"High Tier 4";
-if(p>=100)return"Low Tier 4";
-if(p>=50)return"High Tier 5";
-return"Low Tier 5";
+/* ===== RECORD MATCH ===== */
+function ensurePlayer(name){if(!db.players[name])db.players[name]={pts:0,last:""};}
+function recordMatch(){
+  let A=document.getElementById("playerA").value.trim();
+  let B=document.getElementById("playerB").value.trim();
+  let a=parseInt(document.getElementById("aWins").value);
+  let b=parseInt(document.getElementById("bWins").value);
+  let mode=document.getElementById("mode").value;
+  if(!A||!B||a===b||a>3||b>3){alert("Invalid match"); return;}
+  ensurePlayer(A); ensurePlayer(B);
+  let winner=a>b?A:B,loser=a>b?B:A,matchType=(a===3||b===3)?"dominant":"closefight";
+  db.players[winner].pts+=cfg[mode]; db.players[winner].last=matchType;
+  db.players[loser].pts-=cfg.loss; if(db.players[loser].pts<0)db.players[loser].pts=0; db.players[loser].last=matchType;
+  db.matches.unshift({A,B,a,b,winner,matchType});
+  renderLeaderboard(); renderBracket();
 }
 
-function title(p){
-if(p>=400)return"🏆 Combat Grandmaster";
-if(p>=250)return"🥇 Combat Master";
-if(p>=100)return"🥈 Combat Ace";
-if(p>=50)return"🥉 Combat Specialist";
-if(p>=20)return"⚔️ Combat Cadet";
-if(p>=10)return"🛡️ Combat Novice";
-return"🔰 Rookie";
+/* ===== ADMIN PANEL ===== */
+function toggleAdmin(){
+  let pass=prompt("Password");
+  if(pass!==ADMIN_PASS){alert("Wrong");return;}
+  document.getElementById("adminPanel").style.display="block";
+  document.getElementById("axePts").value=cfg.Axe;
+  document.getElementById("nethPts").value=cfg.Nethpot;
+  document.getElementById("smpPts").value=cfg.SMP;
+  document.getElementById("macePts").value=cfg.Mace;
+  document.getElementById("lossPts").value=cfg.loss;
+}
+function saveConfig(){
+  cfg.Axe=parseInt(document.getElementById("axePts").value);
+  cfg.Nethpot=parseInt(document.getElementById("nethPts").value);
+  cfg.SMP=parseInt(document.getElementById("smpPts").value);
+  cfg.Mace=parseInt(document.getElementById("macePts").value);
+  cfg.loss=parseInt(document.getElementById("lossPts").value);
+  alert("Config saved!");
 }
 
-function ensure(n){
-if(!db.players[n]) db.players[n]={pts:0};
+/* ===== TOURNAMENT ===== */
+function createTournament(){
+  let names=document.getElementById("tournamentPlayers").value.split(",").map(s=>s.trim()).filter(s=>s);
+  if(names.length<2){alert("Enter at least 2 players");return;}
+  db.tournament={rounds:[],currentRound:0};
+  // Random shuffle
+  for(let i=names.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1)); [names[i],names[j]]=[names[j],names[i]];}
+  // create first round pairs
+  let pairs=[];
+  for(let i=0;i<names.length;i+=2){pairs.push([names[i],names[i+1]||null]);}
+  db.tournament.rounds.push(pairs);
+  db.tournament.currentRound=0;
+  renderBracket();
 }
 
-function addMatch(){
-let p1=A.value.trim();
-let p2=B.value.trim();
-let a=parseInt(aW.value);
-let b=parseInt(bW.value);
-let m=mode.value;
-
-if(!p1||!p2||a===b||a>2||b>2) return alert("Invalid BO3");
-
-ensure(p1); ensure(p2);
-
-let win=a>b?p1:p2;
-let lose=a>b?p2:p1;
-
-db.players[win].pts+=cfg[m];
-db.players[lose].pts-=cfg.loss;
-if(db.players[lose].pts<0) db.players[lose].pts=0;
-
-db.log.unshift(`${p1} vs ${p2} (${m}) ${a}:${b} Winner: ${win}`);
-save();
-render();
+function renderBracket(){
+  if(!db.tournament){bracket.innerHTML="No tournament yet"; return;}
+  let html="";
+  db.tournament.rounds.forEach((round,i)=>{
+    html+=`<h3>Round ${i+1}</h3><table id="bracketTable">`;
+    round.forEach(pair=>{
+      let p1=pair[0]||"BYE",p2=pair[1]||"BYE";
+      html+=`<tr><td>${p1}</td><td>vs</td><td>${p2}</td></tr>`;
+    });
+    html+="</table>";
+  });
+  bracket.innerHTML=html;
 }
 
-function render(){
-let arr=Object.entries(db.players)
-.map(([n,d])=>({n,p:d.pts}))
-.sort((a,b)=>b.p-a.p);
-
-board.innerHTML=arr.map((x,i)=>`
-<tr>
-<td>${i+1}</td>
-<td>${x.n}</td>
-<td>${x.p}</td>
-<td>${tier(x.p)}</td>
-<td>${title(x.p)}</td>
-</tr>`).join("");
-
-log.innerHTML=db.log.slice(0,20).join("<br>");
+function advanceWinners(){
+  if(!db.tournament){alert("No tournament");return;}
+  let curr=db.tournament.rounds[db.tournament.currentRound];
+  let nextRound=[];
+  curr.forEach(pair=>{
+    if(!pair[1]){nextRound.push([pair[0]]); return;}
+    // Auto pick random winner for demo (later replace with actual match results)
+    let winner=Math.random()>0.5?pair[0]:pair[1];
+    ensurePlayer(winner); db.players[winner].pts+=10; // add tournament points
+    nextRound.push([winner]);
+  });
+  if(nextRound.length>1) db.tournament.rounds.push(nextRound);
+  db.tournament.currentRound++;
+  renderBracket();
+  renderLeaderboard();
 }
 
-function admin(){
-let p=prompt("Password");
-if(p!==PASS) return alert("Wrong");
-
-cfg.Axe=parseInt(prompt("Axe win pts",cfg.Axe));
-cfg.Nethpot=parseInt(prompt("Nethpot win pts",cfg.Nethpot));
-cfg.SMP=parseInt(prompt("SMP win pts",cfg.SMP));
-cfg.Mace=parseInt(prompt("Mace win pts",cfg.Mace));
-cfg.loss=parseInt(prompt("Loss penalty",cfg.loss));
-save();
-}
-
-render();
+renderLeaderboard();
+renderBracket();
 </script>
-
 </body>
 </html>

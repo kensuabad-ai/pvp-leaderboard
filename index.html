@@ -1,1 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>PvP Tournament Leaderboard</title>
 
+<style>
+body{font-family:Arial;background:#0b1020;color:white;padding:20px}
+.panel{background:#141a33;padding:15px;border-radius:12px;margin-bottom:15px}
+input,select,button{padding:8px;margin:4px;border-radius:8px;border:none}
+button{background:#22c55e;color:white;cursor:pointer}
+table{width:100%;border-collapse:collapse}
+td,th{border-bottom:1px solid #2a335c;padding:8px;text-align:center}
+</style>
+</head>
+
+<body>
+
+<h1>⚔️ PvP Tournament Leaderboard</h1>
+
+<div class="panel">
+<h3>Record Best-of-3 Match</h3>
+Player A <input id="A">
+Player B <input id="B">
+
+<select id="mode">
+<option>Axe</option>
+<option>Nethpot</option>
+<option>SMP</option>
+<option>Mace</option>
+</select>
+
+A Wins <input id="aW" type="number" min="0" max="2">
+B Wins <input id="bW" type="number" min="0" max="2">
+
+<button onclick="addMatch()">Submit Match</button>
+</div>
+
+<div class="panel">
+<button onclick="admin()">Admin Config</button>
+</div>
+
+<div class="panel">
+<h3>Leaderboard</h3>
+<table>
+<thead>
+<tr><th>#</th><th>Name</th><th>Points</th><th>Tier</th><th>Title</th></tr>
+</thead>
+<tbody id="board"></tbody>
+</table>
+</div>
+
+<div class="panel">
+<h3>Recent Matches</h3>
+<div id="log"></div>
+</div>
+
+<script>
+
+const PASS="K=Kensu.com2";
+
+let cfg = JSON.parse(localStorage.cfg || '{"Axe":10,"Nethpot":12,"SMP":8,"Mace":9,"loss":4}');
+let db = JSON.parse(localStorage.db || '{"players":{},"log":[]}');
+
+function save(){
+localStorage.cfg=JSON.stringify(cfg);
+localStorage.db=JSON.stringify(db);
+}
+
+function tier(p){
+if(p>=450)return"High Tier 1";
+if(p>=400)return"Low Tier 1";
+if(p>=350)return"High Tier 2";
+if(p>=300)return"Low Tier 2";
+if(p>=250)return"High Tier 3";
+if(p>=200)return"Low Tier 3";
+if(p>=150)return"High Tier 4";
+if(p>=100)return"Low Tier 4";
+if(p>=50)return"High Tier 5";
+return"Low Tier 5";
+}
+
+function title(p){
+if(p>=400)return"🏆 Combat Grandmaster";
+if(p>=250)return"🥇 Combat Master";
+if(p>=100)return"🥈 Combat Ace";
+if(p>=50)return"🥉 Combat Specialist";
+if(p>=20)return"⚔️ Combat Cadet";
+if(p>=10)return"🛡️ Combat Novice";
+return"🔰 Rookie";
+}
+
+function ensure(n){
+if(!db.players[n]) db.players[n]={pts:0};
+}
+
+function addMatch(){
+let p1=A.value.trim();
+let p2=B.value.trim();
+let a=parseInt(aW.value);
+let b=parseInt(bW.value);
+let m=mode.value;
+
+if(!p1||!p2||a===b||a>2||b>2) return alert("Invalid BO3");
+
+ensure(p1); ensure(p2);
+
+let win=a>b?p1:p2;
+let lose=a>b?p2:p1;
+
+db.players[win].pts+=cfg[m];
+db.players[lose].pts-=cfg.loss;
+if(db.players[lose].pts<0) db.players[lose].pts=0;
+
+db.log.unshift(`${p1} vs ${p2} (${m}) ${a}:${b} Winner: ${win}`);
+save();
+render();
+}
+
+function render(){
+let arr=Object.entries(db.players)
+.map(([n,d])=>({n,p:d.pts}))
+.sort((a,b)=>b.p-a.p);
+
+board.innerHTML=arr.map((x,i)=>`
+<tr>
+<td>${i+1}</td>
+<td>${x.n}</td>
+<td>${x.p}</td>
+<td>${tier(x.p)}</td>
+<td>${title(x.p)}</td>
+</tr>`).join("");
+
+log.innerHTML=db.log.slice(0,20).join("<br>");
+}
+
+function admin(){
+let p=prompt("Password");
+if(p!==PASS) return alert("Wrong");
+
+cfg.Axe=parseInt(prompt("Axe win pts",cfg.Axe));
+cfg.Nethpot=parseInt(prompt("Nethpot win pts",cfg.Nethpot));
+cfg.SMP=parseInt(prompt("SMP win pts",cfg.SMP));
+cfg.Mace=parseInt(prompt("Mace win pts",cfg.Mace));
+cfg.loss=parseInt(prompt("Loss penalty",cfg.loss));
+save();
+}
+
+render();
+</script>
+
+</body>
+</html>
